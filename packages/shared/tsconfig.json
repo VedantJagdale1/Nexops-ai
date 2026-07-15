@@ -1,0 +1,7 @@
+{
+  "extends": "@nexops/tsconfig/node.json",
+  "compilerOptions": {
+    "rootDir": "src"
+  },
+  "include": ["src/**/*.ts"]
+}

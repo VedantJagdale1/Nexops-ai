@@ -1,0 +1,11 @@
+{
+  "name": "@nexops/eslint-config",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./index.mjs",
+  "peerDependencies": {
+    "eslint": ">=9",
+    "typescript": ">=5"
+  }
+}

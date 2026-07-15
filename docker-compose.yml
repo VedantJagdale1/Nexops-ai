@@ -1,0 +1,88 @@
+name: nexops-ai
+
+services:
+  mongodb:
+    image: mongo:8.0
+    restart: unless-stopped
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ['redis-server', '--appendonly', 'yes']
+    ports:
+      - '6379:6379'
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      MONGODB_URI: mongodb://mongodb:27017/nexops
+      CLIENT_URL: http://localhost:5173
+      ACCESS_TOKEN_SECRET: local-only-access-secret-change-before-deploying
+      REFRESH_TOKEN_SECRET: local-only-refresh-secret-change-before-deploying
+      ACCESS_TOKEN_EXPIRY: 15m
+      REFRESH_TOKEN_EXPIRY: 30d
+      COOKIE_SECRET: local-only-cookie-secret-change-before-deploying
+      EMAIL_ENABLED: 'false'
+      SMTP_PORT: 587
+      SMTP_FROM: NexOps AI <no-reply@nexops.local>
+      AI_PROVIDER: mock
+      STORAGE_PROVIDER: local
+      LOCAL_STORAGE_PATH: /workspace/apps/api/uploads
+      REDIS_URL: redis://redis:6379
+      LOG_LEVEL: info
+    ports:
+      - '4000:4000'
+    volumes:
+      - api_uploads:/workspace/apps/api/uploads
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:4000/api/v1/health']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    restart: unless-stopped
+    ports:
+      - '5173:80'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1/health']
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  api_uploads:
+  mongodb_data:
+  redis_data:

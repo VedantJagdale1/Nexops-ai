@@ -1,0 +1,9 @@
+{
+  "extends": "@nexops/tsconfig/react.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true,
+    "types": ["vite/client", "vitest/globals"]
+  },
+  "include": ["src"]
+}

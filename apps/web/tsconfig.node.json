@@ -1,0 +1,9 @@
+{
+  "extends": "@nexops/tsconfig/node.json",
+  "compilerOptions": {
+    "composite": true,
+    "noEmit": true,
+    "types": ["node"]
+  },
+  "include": ["vite.config.ts", "vitest.config.ts", "tailwind.config.ts", "postcss.config.js"]
+}
