@@ -38,7 +38,7 @@ erDiagram
 
 Phase 4 repositories scope client, project, and task operations with the authenticated `organisationId`. Client users are further restricted by their `clientId`; project managers and developers by project manager/member fields; tasks inherit access from their parent project. Project keys are unique per organisation, and task board ordering uses the `{ organisationId, projectId, status, position }` index.
 
-Task moves use `updatedAt` as a compare-and-set version before normalising integer positions in the target column. Project `progress` is recalculated after task creation, status changes, moves, and deletion from completed versus total task counts.
+Task moves use `updatedAt` as a compare-and-set version before normalising integer positions in the target column. Project `progress` is recalculated after task creation, status changes, moves, and deletion from completed versus total task counts. Task comments use `{ organisationId, taskId, createdAt }` ordering; task access is rechecked before both history reads and writes, and author profiles are resolved in bulk.
 
 ## Support, collaboration, and files
 

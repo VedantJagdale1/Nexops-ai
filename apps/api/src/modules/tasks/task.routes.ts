@@ -13,6 +13,8 @@ import { NotificationService } from '../notifications/notification.service.js';
 import { ProjectRepository } from '../projects/project.repository.js';
 import { ProjectService } from '../projects/project.service.js';
 
+import { TaskCommentRepository } from './task-comment.repository.js';
+import { TaskCommentService } from './task-comment.service.js';
 import { createTaskController } from './task.controller.js';
 import { TaskRepository } from './task.repository.js';
 import { TaskService } from './task.service.js';
@@ -29,14 +31,16 @@ export function createTaskRouter(
     new ClientRepository(),
     identity.userRepository,
   );
+  const service = new TaskService(
+    new TaskRepository(),
+    projects,
+    identity.userRepository,
+    new NotificationService(new NotificationRepository(), realtime),
+    realtime,
+  );
   const controller = createTaskController(
-    new TaskService(
-      new TaskRepository(),
-      projects,
-      identity.userRepository,
-      new NotificationService(new NotificationRepository(), realtime),
-      realtime,
-    ),
+    service,
+    new TaskCommentService(new TaskCommentRepository(), service, realtime),
   );
   router.use(
     requireAuthentication(identity.tokenService, identity.userRepository),
@@ -44,6 +48,16 @@ export function createTaskRouter(
   );
   router.get('/', requirePermission('task:read'), asyncHandler(controller.list));
   router.post('/', requirePermission('task:create'), asyncHandler(controller.create));
+  router.get(
+    '/:taskId/comments',
+    requirePermission('task:read'),
+    asyncHandler(controller.listComments),
+  );
+  router.post(
+    '/:taskId/comments',
+    requirePermission('task:comment'),
+    asyncHandler(controller.createComment),
+  );
   router.get('/:taskId', requirePermission('task:read'), asyncHandler(controller.get));
   router.patch('/:taskId', requirePermission('task:update'), asyncHandler(controller.update));
   router.patch('/:taskId/move', requirePermission('task:update'), asyncHandler(controller.move));

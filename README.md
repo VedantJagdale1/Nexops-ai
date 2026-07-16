@@ -21,6 +21,7 @@ NexOps AI is a multi-tenant client project management platform for software agen
 - Searchable and paginated client and project management
 - Project membership and client-account access policies
 - Persistent five-stage Kanban with conflict detection and optimistic rollback
+- Real-time Kanban viewers, cross-client task moves, persisted task comments, and typing indicators
 - Project progress recalculation from completed task data
 - Responsive light/dark application shell and Recharts dashboard visualisations
 - SLA-aware support tickets with client-safe discussions and private internal notes
@@ -89,6 +90,8 @@ When `EMAIL_ENABLED=false`, verification, recovery, and invitation emails are in
 
 All public API routes are versioned under `/api/v1`. Successful responses use `{ "success": true, "data": ..., "meta": ... }`; errors use a stable error code, safe message, details array, and request ID. Authentication and current delivery-domain routes are documented in [API overview](docs/api-overview.md). Socket authentication, rooms, acknowledgements, and events are documented in [Socket events](docs/socket-events.md). OpenAPI generation remains scheduled for Phase 9.
 
+The interview assignment implementation and two-browser demonstration steps are documented in [Real-time Kanban assignment](docs/interview-assignment.md).
+
 ## Security baseline
 
 The API applies secure headers, explicit credentialed CORS, JSON body limits, NoSQL operator sanitization, request IDs, centralized error mapping, structured log redaction, authentication rate limits, short-lived access tokens, hashed rotating refresh tokens, replay-family revocation, tenant filters, permission middleware, and entity-level access policies. See [Security](docs/security.md).
@@ -112,7 +115,7 @@ The comprehensive seed and documented development-only credentials are introduce
 
 ## Known limitations
 
-AI, expanded analytics, audit, and organisation-settings workflows are introduced in subsequent phases. Notification polling remains as a 30-second resilience fallback when a socket connection is unavailable. The in-memory Socket.IO adapter supports a single API instance; horizontal deployments require a Redis adapter. The S3 configuration value is reserved but intentionally rejected at startup; production file storage currently supports authenticated Cloudinary assets. Task detail editing, comments, checklist interaction, and activity timelines remain in the delivery expansion. SMTP delivery is disabled by default.
+AI, expanded analytics, audit, and organisation-settings workflows are introduced in subsequent phases. Notification polling remains as a 30-second resilience fallback when a socket connection is unavailable. The in-memory Socket.IO adapter supports a single API instance; horizontal deployments require a Redis adapter. The S3 configuration value is reserved but intentionally rejected at startup; production file storage currently supports authenticated Cloudinary assets. Task detail editing, checklist interaction, and activity timelines remain in the delivery expansion. SMTP delivery is disabled by default.
 
 ## Planned documentation
 

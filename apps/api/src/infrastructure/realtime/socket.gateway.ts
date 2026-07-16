@@ -3,6 +3,7 @@ import {
   projectRoomInputSchema,
   projectTypingInputSchema,
   roleHasPermission,
+  taskTypingInputSchema,
 } from '@nexops/shared';
 import { Server } from 'socket.io';
 
@@ -194,8 +195,8 @@ export function configureSocketGateway(
           acknowledge(failure('SOCKET_INPUT_INVALID', 'A valid project is required'));
           return;
         }
-        if (!roleHasPermission(user.role, 'chat:read')) {
-          acknowledge(failure('CHAT_ACCESS_DENIED', 'Project chat access is denied'));
+        if (!roleHasPermission(user.role, 'project:read')) {
+          acknowledge(failure('PROJECT_ACCESS_DENIED', 'Project access is denied'));
           return;
         }
         try {
@@ -242,6 +243,22 @@ export function configureSocketGateway(
           user: socket.data.participant,
           isTyping: input.data.isTyping,
         });
+    });
+
+    socket.on('task:typing', (rawInput) => {
+      const input = taskTypingInputSchema.safeParse(rawInput);
+      if (
+        !input.success ||
+        !roleHasPermission(user.role, 'task:comment') ||
+        !socket.data.joinedProjects.has(input.data.projectId)
+      )
+        return;
+      socket.to(roomNames.project(user.organisationId, input.data.projectId)).emit('task:typing', {
+        projectId: input.data.projectId,
+        taskId: input.data.taskId,
+        user: socket.data.participant,
+        isTyping: input.data.isTyping,
+      });
     });
 
     socket.on('chat:send', (rawInput, acknowledge) => {

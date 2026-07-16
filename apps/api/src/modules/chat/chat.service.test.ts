@@ -43,6 +43,7 @@ function realtime(): RealtimePublisher {
   return {
     publishProjectMessage: vi.fn(),
     publishTaskUpdated: vi.fn(),
+    publishTaskCommented: vi.fn(),
     publishTicketUpdated: vi.fn(),
     publishNotification: vi.fn(),
   };

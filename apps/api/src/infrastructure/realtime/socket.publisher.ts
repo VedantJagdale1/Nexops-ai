@@ -2,7 +2,13 @@ import { roomNames } from './rooms.js';
 
 import type { RealtimePublisher } from './realtime.publisher.js';
 import type { RealtimeServer } from './socket.gateway.js';
-import type { NotificationDto, ProjectMessageDto, TaskDto, TicketDto } from '@nexops/shared';
+import type {
+  NotificationDto,
+  ProjectMessageDto,
+  TaskCommentDto,
+  TaskDto,
+  TicketDto,
+} from '@nexops/shared';
 
 export class SocketRealtimePublisher implements RealtimePublisher {
   public constructor(private readonly server: RealtimeServer) {}
@@ -17,6 +23,14 @@ export class SocketRealtimePublisher implements RealtimePublisher {
 
   public publishTaskUpdated(organisationId: string, projectId: string, task: TaskDto): void {
     this.server.to(roomNames.project(organisationId, projectId)).emit('task:updated', task);
+  }
+
+  public publishTaskCommented(
+    organisationId: string,
+    projectId: string,
+    comment: TaskCommentDto,
+  ): void {
+    this.server.to(roomNames.project(organisationId, projectId)).emit('task:commented', comment);
   }
 
   public publishTicketUpdated(organisationId: string, clientId: string, ticket: TicketDto): void {

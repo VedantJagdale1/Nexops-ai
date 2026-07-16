@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
-import { optimisticallyMoveTask } from './kanban-state';
+import { mergeTaskComment, optimisticallyMoveTask, reconcileRealtimeTask } from './kanban-state';
 
-import type { TaskDto } from '@nexops/shared';
+import type { TaskCommentDto, TaskDto } from '@nexops/shared';
 
 const base = {
   projectId: 'project',
@@ -35,5 +35,36 @@ describe('optimisticallyMoveTask', () => {
         .map((task) => task.id),
     ).toEqual(['two', 'one', 'three']);
     expect(tasks[0]?.status).toBe('todo');
+  });
+
+  it('reconciles a task received from another client and normalises both columns', () => {
+    const incoming = {
+      ...tasks[0]!,
+      status: 'in_progress' as const,
+      position: 1,
+      updatedAt: '2026-01-01T00:05:00.000Z',
+    };
+    const result = reconcileRealtimeTask(tasks, incoming);
+
+    expect(
+      result
+        .filter((task) => task.status === 'in_progress')
+        .sort((first, second) => first.position - second.position)
+        .map((task) => task.id),
+    ).toEqual(['two', 'one', 'three']);
+    expect(result.filter((task) => task.status === 'todo')).toHaveLength(0);
+  });
+
+  it('deduplicates comments received through the REST response and Socket.IO broadcast', () => {
+    const comment = {
+      id: 'comment-one',
+      taskId: 'one',
+      projectId: 'project',
+      author: { id: 'developer', name: 'Dev User', role: 'developer' },
+      content: 'Ready for review.',
+      createdAt: '2026-01-01T00:10:00.000Z',
+    } satisfies TaskCommentDto;
+
+    expect(mergeTaskComment(mergeTaskComment([], comment), comment)).toEqual([comment]);
   });
 });

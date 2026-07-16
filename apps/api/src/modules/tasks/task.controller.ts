@@ -1,6 +1,8 @@
 import {
   moveTaskSchema,
   objectIdSchema,
+  taskCommentInputSchema,
+  taskCommentListQuerySchema,
   taskInputSchema,
   taskListQuerySchema,
   updateTaskSchema,
@@ -8,6 +10,7 @@ import {
 
 import { AppError } from '../../common/errors/app-error.js';
 
+import type { TaskCommentService } from './task-comment.service.js';
 import type { TaskService } from './task.service.js';
 import type { Request, Response } from 'express';
 function actor(request: Request) {
@@ -19,7 +22,7 @@ function actor(request: Request) {
     });
   return request.auth;
 }
-export function createTaskController(service: TaskService) {
+export function createTaskController(service: TaskService, comments: TaskCommentService) {
   return {
     list: async (request: Request, response: Response) => {
       response.json({
@@ -39,6 +42,27 @@ export function createTaskController(service: TaskService) {
       response.status(201).json({
         success: true,
         data: await service.create(actor(request), taskInputSchema.parse(request.body)),
+        meta: {},
+      });
+    },
+    listComments: async (request: Request, response: Response) => {
+      const query = taskCommentListQuerySchema.parse(request.query);
+      const result = await comments.history(
+        actor(request),
+        objectIdSchema.parse(request.params.taskId),
+        query.page,
+        query.limit,
+      );
+      response.json({ success: true, data: result.items, meta: result.meta });
+    },
+    createComment: async (request: Request, response: Response) => {
+      response.status(201).json({
+        success: true,
+        data: await comments.create(
+          actor(request),
+          objectIdSchema.parse(request.params.taskId),
+          taskCommentInputSchema.parse(request.body),
+        ),
         meta: {},
       });
     },

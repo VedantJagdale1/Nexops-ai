@@ -11,6 +11,7 @@ import { testEnvironment } from '../../test/environment.js';
 
 import { roomNames } from './rooms.js';
 import { configureSocketGateway, createRealtimeServer } from './socket.gateway.js';
+import { SocketRealtimePublisher } from './socket.publisher.js';
 
 import type { ChatService } from '../../modules/chat/chat.service.js';
 import type { User } from '../../modules/users/user.model.js';
@@ -19,6 +20,9 @@ import type {
   AuthenticatedUserDto,
   ClientToServerEvents,
   ServerToClientEvents,
+  TaskCommentDto,
+  TaskDto,
+  TaskTypingDto,
 } from '@nexops/shared';
 import type { HydratedDocument } from 'mongoose';
 import type { Socket as ClientSocket } from 'socket.io-client';
@@ -121,6 +125,17 @@ describe('Socket gateway authorisation', () => {
     return client;
   }
 
+  async function joinProject(
+    client: ClientSocket<ServerToClientEvents, ClientToServerEvents>,
+  ): Promise<void> {
+    const response = await new Promise<
+      Parameters<Parameters<ClientToServerEvents['project:join']>[1]>[0]
+    >((resolve) => {
+      client.emit('project:join', { projectId: allowedProjectId }, resolve);
+    });
+    expect(response).toMatchObject({ success: true });
+  }
+
   it('rejects socket connections without a valid access token', async () => {
     const client = createClient(url, {
       auth: { token: 'invalid' },
@@ -161,5 +176,71 @@ describe('Socket gateway authorisation', () => {
       .fetchSockets();
     expect(response).toMatchObject({ success: false, error: { code: 'PROJECT_NOT_FOUND' } });
     expect(sockets).toHaveLength(0);
+  });
+
+  it('broadcasts project presence and task typing only inside an authorised room', async () => {
+    const first = await connect(accessToken());
+    await joinProject(first);
+    const presenceUpdate = new Promise<number>((resolve) => {
+      first.once('presence:update', (presence) => resolve(presence.users.length));
+    });
+    const second = await connect(accessToken());
+    await joinProject(second);
+    expect(await presenceUpdate).toBe(1);
+
+    const typingUpdate = new Promise<TaskTypingDto>((resolve) => {
+      first.once('task:typing', resolve);
+    });
+    const typingTaskId = new Types.ObjectId().toString();
+    second.emit('task:typing', {
+      projectId: allowedProjectId,
+      taskId: typingTaskId,
+      isTyping: true,
+    });
+    await expect(typingUpdate).resolves.toMatchObject({
+      projectId: allowedProjectId,
+      taskId: typingTaskId,
+      isTyping: true,
+      user: { id: userId.toString() },
+    });
+  });
+
+  it('delivers task moves and persisted comments to project viewers', async () => {
+    const client = await connect(accessToken());
+    await joinProject(client);
+    const publisher = new SocketRealtimePublisher(socketServer);
+    const task = {
+      id: new Types.ObjectId().toString(),
+      projectId: allowedProjectId,
+      title: 'Move the integration card',
+      status: 'in_progress',
+      priority: 'high',
+      assigneeIds: [userId.toString()],
+      reporterId: userId.toString(),
+      loggedMinutes: 0,
+      labels: [],
+      checklist: [],
+      position: 0,
+      createdAt: '2026-07-16T07:00:00.000Z',
+      updatedAt: '2026-07-16T07:05:00.000Z',
+    } satisfies TaskDto;
+    const comment = {
+      id: new Types.ObjectId().toString(),
+      taskId: task.id,
+      projectId: allowedProjectId,
+      author: { id: userId.toString(), name: 'Realtime Developer', role: 'developer' },
+      content: 'This comment was persisted before broadcast.',
+      createdAt: '2026-07-16T07:06:00.000Z',
+    } satisfies TaskCommentDto;
+    const taskUpdate = new Promise<TaskDto>((resolve) => client.once('task:updated', resolve));
+    const commentUpdate = new Promise<TaskCommentDto>((resolve) =>
+      client.once('task:commented', resolve),
+    );
+
+    publisher.publishTaskUpdated(organisationId.toString(), allowedProjectId, task);
+    publisher.publishTaskCommented(organisationId.toString(), allowedProjectId, comment);
+
+    await expect(taskUpdate).resolves.toEqual(task);
+    await expect(commentUpdate).resolves.toEqual(comment);
   });
 });

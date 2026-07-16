@@ -1,10 +1,11 @@
 import { useEffect } from 'react';
 
+import { mergeTaskComment, reconcileRealtimeTask } from '../features/delivery/kanban-state';
 import { queryClient } from '../lib/query-client';
 import { getRealtimeSocket } from '../lib/socket-client';
 import { useAuthStore } from '../stores/auth-store';
 
-import type { TaskDto, TicketDto } from '@nexops/shared';
+import type { TaskCommentDto, TaskDto, TicketDto } from '@nexops/shared';
 import type { PropsWithChildren } from 'react';
 
 export function RealtimeProvider({ children }: PropsWithChildren): JSX.Element {
@@ -18,11 +19,13 @@ export function RealtimeProvider({ children }: PropsWithChildren): JSX.Element {
     const handleTask = (task: TaskDto) => {
       queryClient.setQueryData<TaskDto[]>(['tasks', task.projectId], (current) => {
         if (!current) return current;
-        const exists = current.some((item) => item.id === task.id);
-        return exists
-          ? current.map((item) => (item.id === task.id ? task : item))
-          : [...current, task];
+        return reconcileRealtimeTask(current, task);
       });
+    };
+    const handleTaskComment = (comment: TaskCommentDto) => {
+      queryClient.setQueryData<TaskCommentDto[]>(['task-comments', comment.taskId], (current) =>
+        mergeTaskComment(current, comment),
+      );
     };
     const handleTicket = (ticket: TicketDto) => {
       queryClient.setQueryData(['ticket', ticket.id], ticket);
@@ -31,6 +34,7 @@ export function RealtimeProvider({ children }: PropsWithChildren): JSX.Element {
 
     socket.on('notification:new', handleNotification);
     socket.on('task:updated', handleTask);
+    socket.on('task:commented', handleTaskComment);
     socket.on('ticket:updated', handleTicket);
     if (accessToken) {
       if (socket.connected) socket.disconnect();
@@ -41,6 +45,7 @@ export function RealtimeProvider({ children }: PropsWithChildren): JSX.Element {
     return () => {
       socket.off('notification:new', handleNotification);
       socket.off('task:updated', handleTask);
+      socket.off('task:commented', handleTaskComment);
       socket.off('ticket:updated', handleTicket);
     };
   }, [accessToken]);

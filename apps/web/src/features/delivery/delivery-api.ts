@@ -7,6 +7,8 @@ import type {
   PaginationMeta,
   ProjectDto,
   ProjectInput,
+  TaskCommentDto,
+  TaskCommentInput,
   TaskDto,
   TaskInput,
   TeamMemberDto,
@@ -72,6 +74,22 @@ export async function moveTask(
       expectedUpdatedAt,
     })
   ).data.data;
+}
+
+export async function listTaskComments(taskId: string): Promise<TaskCommentDto[]> {
+  return (
+    await apiClient.get<Envelope<TaskCommentDto[]>>(`/tasks/${taskId}/comments`, {
+      params: { page: 1, limit: 100 },
+    })
+  ).data.data;
+}
+
+export async function createTaskComment(
+  taskId: string,
+  input: TaskCommentInput,
+): Promise<TaskCommentDto> {
+  return (await apiClient.post<Envelope<TaskCommentDto>>(`/tasks/${taskId}/comments`, input)).data
+    .data;
 }
 
 export async function listTeam(): Promise<TeamMemberDto[]> {

@@ -1,4 +1,10 @@
-import type { NotificationDto, ProjectMessageDto, TaskDto, TicketDto } from '@nexops/shared';
+import type {
+  NotificationDto,
+  ProjectMessageDto,
+  TaskCommentDto,
+  TaskDto,
+  TicketDto,
+} from '@nexops/shared';
 
 export interface RealtimePublisher {
   publishProjectMessage(
@@ -7,6 +13,7 @@ export interface RealtimePublisher {
     message: ProjectMessageDto,
   ): void;
   publishTaskUpdated(organisationId: string, projectId: string, task: TaskDto): void;
+  publishTaskCommented(organisationId: string, projectId: string, comment: TaskCommentDto): void;
   publishTicketUpdated(organisationId: string, clientId: string, ticket: TicketDto): void;
   publishNotification(organisationId: string, userId: string, notification: NotificationDto): void;
 }
@@ -14,6 +21,7 @@ export interface RealtimePublisher {
 export const noopRealtimePublisher: RealtimePublisher = {
   publishProjectMessage: () => undefined,
   publishTaskUpdated: () => undefined,
+  publishTaskCommented: () => undefined,
   publishTicketUpdated: () => undefined,
   publishNotification: () => undefined,
 };

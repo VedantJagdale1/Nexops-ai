@@ -52,6 +52,8 @@ All routes below require a bearer access token, an active organisation, and the 
 | `GET`    | `/tasks/:taskId`                      | `task:read`       | Read a task                                |
 | `PATCH`  | `/tasks/:taskId`                      | `task:update`     | Update task fields                         |
 | `PATCH`  | `/tasks/:taskId/move`                 | `task:update`     | Persist a Kanban status and position       |
+| `GET`    | `/tasks/:taskId/comments`             | `task:read`       | Read paginated task discussion history     |
+| `POST`   | `/tasks/:taskId/comments`             | `task:comment`    | Persist and broadcast a task comment       |
 | `DELETE` | `/tasks/:taskId`                      | `project:update`  | Delete a task                              |
 | `GET`    | `/analytics/dashboard`                | `analytics:read`  | Role-scoped operational dashboard          |
 | `GET`    | `/tickets`                            | `ticket:read`     | Search and filter accessible tickets       |
@@ -77,7 +79,9 @@ List endpoints accept bounded pagination, search, allow-listed sort fields, and 
 
 ## Kanban concurrency
 
-`PATCH /tasks/:taskId/move` accepts `status`, zero-based `position`, and `expectedUpdatedAt`. The repository updates only when the persisted timestamp matches the last version seen by the caller. A competing update returns HTTP `409` with `TASK_UPDATE_CONFLICT`; the web client restores its previous query cache and refetches the canonical board. Successful moves normalise positions in the target column and recalculate project progress from completed versus total tasks.
+`PATCH /tasks/:taskId/move` accepts `status`, zero-based `position`, and `expectedUpdatedAt`. The repository updates only when the persisted timestamp matches the last version seen by the caller. A competing update returns HTTP `409` with `TASK_UPDATE_CONFLICT`; the web client restores its previous query cache and refetches the canonical board. Successful moves normalise positions in the target column, recalculate project progress, and publish the resulting task to authorised viewers. Remote clients reconcile both affected columns in memory without reloading the page.
+
+Task comments are stored separately from tasks, tenant-scoped through the parent task and project access policy, and broadcast only after MongoDB persistence succeeds. Author profiles are loaded in one tenant-scoped query per history page.
 
 ## Support, billing, and file safeguards
 

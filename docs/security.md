@@ -28,6 +28,7 @@ Tenant repositories must use `buildTenantFilter()`. It rejects direct or nested 
 - Ticket internal notes are removed before client responses. Invoice and ticket reads return not-found semantics when client-account ownership does not match, limiting resource discovery.
 - Socket handshakes accept server-verified access tokens, reload the active user, and never accept an organisation identifier from clients. Project rooms are tenant-qualified and require the same entity-access policy as REST.
 - Staff and client ticket events use separate rooms, user notifications use identity-specific rooms, and chat sends require a prior authorised project join. Socket message bursts are rate-limited.
+- Kanban task and comment events are published only to authorised, tenant-qualified project rooms. Comment requests derive organisation, project, task, and author identity from authenticated state; task-comment typing is ephemeral and contains no draft content.
 
 ## Operational requirements
 

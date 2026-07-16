@@ -105,6 +105,14 @@ export const taskListQuerySchema = z.object({
   assigneeId: objectIdSchema.optional(),
 });
 
+export const taskCommentInputSchema = z.object({
+  content: z.string().trim().min(1).max(10_000),
+});
+
+export const taskCommentListQuerySchema = paginationQuerySchema.extend({
+  limit: z.coerce.number().int().min(1).max(100).default(50),
+});
+
 export type ClientInput = z.input<typeof clientInputSchema>;
 export type UpdateClientInput = z.infer<typeof updateClientSchema>;
 export type ProjectInput = z.input<typeof projectInputSchema>;
@@ -112,6 +120,7 @@ export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type TaskInput = z.input<typeof taskInputSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type MoveTaskInput = z.infer<typeof moveTaskSchema>;
+export type TaskCommentInput = z.infer<typeof taskCommentInputSchema>;
 
 export interface ClientDto {
   id: string;
@@ -170,6 +179,23 @@ export interface TaskDto {
   position: number;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface TaskCommentAuthorDto {
+  id: string;
+  name: string;
+  role: string;
+  avatarUrl?: string;
+}
+
+export interface TaskCommentDto {
+  id: string;
+  taskId: string;
+  projectId: string;
+  author: TaskCommentAuthorDto;
+  content: string;
+  editedAt?: string;
+  createdAt: string;
 }
 
 export interface TeamMemberDto {

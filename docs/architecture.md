@@ -174,7 +174,9 @@ sequenceDiagram
   Chat-->>Web: chat:message to authorised room
 ```
 
-Presence is connection-counted so one user with multiple tabs appears once. Typing state is ephemeral. Chat sends are limited per socket, and acknowledgements use typed success/error envelopes. The publisher routes tasks to project rooms, tickets to staff plus the linked client room, and notifications to an individual user room. A single-instance in-memory adapter is currently used; a Redis adapter is required before horizontally scaling the API.
+Presence is connection-counted so one user with multiple tabs appears once. Typing state is ephemeral. Chat sends are limited per socket, and acknowledgements use typed success/error envelopes. The publisher routes tasks and persisted task comments to project rooms, tickets to staff plus the linked client room, and notifications to an individual user room. A single-instance in-memory adapter is currently used; a Redis adapter is required before horizontally scaling the API.
+
+The Kanban route joins the same authorised project room and rejoins after socket reconnection. Task moves are persisted over REST with compare-and-set conflict detection, then emitted as `task:updated`; remote caches reconcile both affected columns in memory. Task discussion writes persist to the separate tenant-scoped comment collection before `task:commented` is broadcast. Per-task typing events contain no comment content and are not persisted.
 
 ## Observability and failure handling
 

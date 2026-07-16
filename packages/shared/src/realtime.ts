@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { objectIdSchema, paginationQuerySchema } from './schemas.js';
 
-import type { TaskDto } from './delivery.js';
+import type { TaskCommentDto, TaskDto } from './delivery.js';
 import type { NotificationDto, TicketDto } from './operations.js';
 
 export const projectMessageInputSchema = z.object({
@@ -16,6 +16,11 @@ export const projectTypingInputSchema = z.object({
   projectId: objectIdSchema,
   isTyping: z.boolean(),
 });
+export const taskTypingInputSchema = z.object({
+  projectId: objectIdSchema,
+  taskId: objectIdSchema,
+  isTyping: z.boolean(),
+});
 export const chatHistoryQuerySchema = paginationQuerySchema.extend({
   limit: z.coerce.number().int().min(1).max(100).default(50),
 });
@@ -23,6 +28,7 @@ export const chatHistoryQuerySchema = paginationQuerySchema.extend({
 export type ProjectMessageInput = z.infer<typeof projectMessageInputSchema>;
 export type ProjectRoomInput = z.infer<typeof projectRoomInputSchema>;
 export type ProjectTypingInput = z.infer<typeof projectTypingInputSchema>;
+export type TaskTypingInput = z.infer<typeof taskTypingInputSchema>;
 
 export interface ChatParticipantDto {
   id: string;
@@ -52,6 +58,13 @@ export interface ProjectTypingDto {
   isTyping: boolean;
 }
 
+export interface TaskTypingDto {
+  projectId: string;
+  taskId: string;
+  user: ChatParticipantDto;
+  isTyping: boolean;
+}
+
 export type SocketAck<T> =
   { success: true; data: T } | { success: false; error: { code: string; message: string } };
 
@@ -69,6 +82,7 @@ export interface ClientToServerEvents {
     acknowledge: (response: SocketAck<ProjectMessageDto>) => void,
   ) => void;
   'typing:update': (input: ProjectTypingInput) => void;
+  'task:typing': (input: TaskTypingInput) => void;
 }
 
 export interface ServerToClientEvents {
@@ -76,6 +90,8 @@ export interface ServerToClientEvents {
   'presence:update': (presence: ProjectPresenceDto) => void;
   'typing:update': (typing: ProjectTypingDto) => void;
   'task:updated': (task: TaskDto) => void;
+  'task:commented': (comment: TaskCommentDto) => void;
+  'task:typing': (typing: TaskTypingDto) => void;
   'ticket:updated': (ticket: TicketDto) => void;
   'notification:new': (notification: NotificationDto) => void;
 }

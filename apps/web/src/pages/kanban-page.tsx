@@ -10,21 +10,32 @@ import { SortableContext, useSortable, verticalListSortingStrategy } from '@dnd-
 import { CSS } from '@dnd-kit/utilities';
 import { roleHasPermission, taskStatuses } from '@nexops/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, CheckSquare2, Clock3, GripVertical, Plus, UserRound } from 'lucide-react';
-import { useState } from 'react';
+import {
+  CalendarDays,
+  CheckSquare2,
+  Clock3,
+  GripVertical,
+  MessageSquareText,
+  Plus,
+  UserRound,
+  UsersRound,
+} from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import { ErrorPanel } from '../components/error-panel';
 import { Modal } from '../components/modal';
 import { createTask, listTasks, moveTask } from '../features/delivery/delivery-api';
 import { optimisticallyMoveTask } from '../features/delivery/kanban-state';
+import { TaskCommentsPanel } from '../features/delivery/task-comments-panel';
 import { TaskForm } from '../features/delivery/task-form';
 import { getApiErrorMessage } from '../lib/api-client';
+import { getRealtimeSocket } from '../lib/socket-client';
 import { useAuthStore } from '../stores/auth-store';
 
 import { useProject } from './project-context';
 
 import type { DragEndEvent } from '@dnd-kit/core';
-import type { TaskDto, TaskInput } from '@nexops/shared';
+import type { ChatParticipantDto, TaskDto, TaskInput, TaskTypingDto } from '@nexops/shared';
 
 const columns: Array<{ id: TaskDto['status']; label: string; dot: string }> = [
   { id: 'backlog', label: 'Backlog', dot: 'bg-slate-400' },
@@ -45,9 +56,76 @@ export function KanbanPage(): JSX.Element {
   const user = useAuthStore((state) => state.user);
   const cache = useQueryClient();
   const [modal, setModal] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<TaskDto>();
+  const [presence, setPresence] = useState<ChatParticipantDto[]>([]);
+  const [typingByTask, setTypingByTask] = useState<Map<string, Map<string, ChatParticipantDto>>>(
+    new Map(),
+  );
+  const [realtimeStatus, setRealtimeStatus] = useState<'connecting' | 'live' | 'offline'>(
+    'connecting',
+  );
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   const queryKey = ['tasks', project.id] as const;
   const query = useQuery({ queryKey, queryFn: () => listTasks(project.id) });
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+    const joinProject = () => {
+      setRealtimeStatus('connecting');
+      socket.emit('project:join', { projectId: project.id }, (response) => {
+        if (response.success) {
+          setPresence(response.data.users);
+          setRealtimeStatus('live');
+        } else {
+          setRealtimeStatus('offline');
+        }
+      });
+    };
+    const handlePresence = (update: { projectId: string; users: ChatParticipantDto[] }) => {
+      if (update.projectId !== project.id) return;
+      setPresence(update.users);
+      const onlineIds = new Set(update.users.map((participant) => participant.id));
+      setTypingByTask((current) => {
+        const next = new Map<string, Map<string, ChatParticipantDto>>();
+        for (const [taskId, users] of current) {
+          const online = new Map(Array.from(users).filter(([userId]) => onlineIds.has(userId)));
+          if (online.size > 0) next.set(taskId, online);
+        }
+        return next;
+      });
+    };
+    const handleTyping = (update: TaskTypingDto) => {
+      if (update.projectId !== project.id) return;
+      setTypingByTask((current) => {
+        const next = new Map(current);
+        const users = new Map(next.get(update.taskId) ?? []);
+        if (update.isTyping) users.set(update.user.id, update.user);
+        else users.delete(update.user.id);
+        if (users.size > 0) next.set(update.taskId, users);
+        else next.delete(update.taskId);
+        return next;
+      });
+    };
+    const handleDisconnect = () => {
+      setPresence([]);
+      setTypingByTask(new Map());
+      setRealtimeStatus('offline');
+    };
+
+    socket.on('connect', joinProject);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('presence:update', handlePresence);
+    socket.on('task:typing', handleTyping);
+    if (socket.connected) joinProject();
+
+    return () => {
+      socket.off('connect', joinProject);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('presence:update', handlePresence);
+      socket.off('task:typing', handleTyping);
+      if (socket.connected)
+        socket.emit('project:leave', { projectId: project.id }, () => undefined);
+    };
+  }, [project.id]);
   const createMutation = useMutation({
     mutationFn: createTask,
     onSuccess: async () => {
@@ -125,14 +203,47 @@ export function KanbanPage(): JSX.Element {
             Drag tasks between stages. Changes are saved immediately.
           </p>
         </div>
-        {user && roleHasPermission(user.role, 'task:create') ? (
-          <button
-            onClick={() => setModal(true)}
-            className="bg-brand-600 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white"
-          >
-            <Plus className="size-4" /> Add task
-          </button>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-sm dark:border-white/10 dark:bg-slate-900">
+            <div className="flex -space-x-1.5" aria-hidden="true">
+              {presence.slice(0, 3).map((participant) => (
+                <span
+                  key={participant.id}
+                  title={participant.name}
+                  className="bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-200 grid size-6 place-items-center rounded-full border-2 border-white text-[9px] font-bold dark:border-slate-900"
+                >
+                  {participant.name
+                    .split(' ')
+                    .slice(0, 2)
+                    .map((part) => part[0])
+                    .join('')
+                    .toUpperCase()}
+                </span>
+              ))}
+              {presence.length === 0 ? <UsersRound className="size-5 text-slate-400" /> : null}
+            </div>
+            <div className="leading-tight">
+              <p className="text-xs font-semibold">{presence.length} viewing</p>
+              <p
+                className={`text-[10px] font-medium ${realtimeStatus === 'live' ? 'text-emerald-600 dark:text-emerald-300' : 'text-slate-400'}`}
+              >
+                {realtimeStatus === 'live'
+                  ? 'Live collaboration'
+                  : realtimeStatus === 'connecting'
+                    ? 'Connecting…'
+                    : 'Reconnecting…'}
+              </p>
+            </div>
+          </div>
+          {user && roleHasPermission(user.role, 'task:create') ? (
+            <button
+              onClick={() => setModal(true)}
+              className="bg-brand-600 inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white"
+            >
+              <Plus className="size-4" /> Add task
+            </button>
+          ) : null}
+        </div>
       </div>
       {moveMutation.isError ? (
         <div
@@ -151,6 +262,7 @@ export function KanbanPage(): JSX.Element {
               tasks={tasks
                 .filter((task) => task.status === column.id)
                 .sort((a, b) => a.position - b.position)}
+              onDiscuss={setSelectedTask}
             />
           ))}
         </div>
@@ -164,6 +276,19 @@ export function KanbanPage(): JSX.Element {
           submitting={createMutation.isPending}
         />
       </Modal>
+      <Modal
+        open={Boolean(selectedTask)}
+        title={selectedTask?.title ?? 'Task discussion'}
+        onClose={() => setSelectedTask(undefined)}
+      >
+        {selectedTask ? (
+          <TaskCommentsPanel
+            task={tasks.find((task) => task.id === selectedTask.id) ?? selectedTask}
+            canComment={Boolean(user && roleHasPermission(user.role, 'task:comment'))}
+            typingUsers={Array.from(typingByTask.get(selectedTask.id)?.values() ?? [])}
+          />
+        ) : null}
+      </Modal>
     </section>
   );
 }
@@ -171,9 +296,11 @@ export function KanbanPage(): JSX.Element {
 function KanbanColumn({
   column,
   tasks,
+  onDiscuss,
 }: {
   column: (typeof columns)[number];
   tasks: TaskDto[];
+  onDiscuss: (task: TaskDto) => void;
 }): JSX.Element {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   return (
@@ -193,7 +320,7 @@ function KanbanColumn({
       <SortableContext items={tasks.map((task) => task.id)} strategy={verticalListSortingStrategy}>
         <div className="mt-2 space-y-3">
           {tasks.map((task) => (
-            <TaskCard key={task.id} task={task} />
+            <TaskCard key={task.id} task={task} onDiscuss={onDiscuss} />
           ))}
           {tasks.length === 0 ? (
             <div className="grid h-32 place-items-center rounded-xl border border-dashed border-slate-300 text-xs text-slate-400 dark:border-white/10">
@@ -206,7 +333,13 @@ function KanbanColumn({
   );
 }
 
-function TaskCard({ task }: { task: TaskDto }): JSX.Element {
+function TaskCard({
+  task,
+  onDiscuss,
+}: {
+  task: TaskDto;
+  onDiscuss: (task: TaskDto) => void;
+}): JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: task.id,
   });
@@ -270,6 +403,14 @@ function TaskCard({ task }: { task: TaskDto }): JSX.Element {
           <UserRound className="size-3.5" />
           {task.assigneeIds.length || ''}
         </span>
+        <button
+          type="button"
+          onClick={() => onDiscuss(task)}
+          className="text-brand-700 hover:bg-brand-50 dark:text-brand-300 dark:hover:bg-brand-950/40 flex items-center gap-1 rounded-md px-1.5 py-1 font-medium transition"
+          aria-label={`Open discussion for ${task.title}`}
+        >
+          <MessageSquareText className="size-3.5" /> Discuss
+        </button>
       </div>
     </article>
   );
